@@ -1,8 +1,8 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -12,150 +12,35 @@ const (
 )
 
 func main() {
+	hash_obj_flag := flag.NewFlagSet("hash-object", flag.ExitOnError)
+
 	if len(os.Args) < 2 {
-		fmt.Println("Usage")
+		flag.Usage()
 		return
 	}
 
 	switch os.Args[1] {
 	case "init":
 		init_cmd()
+	case "hash-object":
+		w := hash_obj_flag.Bool("w", false, "Actually write the object into the object database.")
+		stdin := hash_obj_flag.Bool("stdin", false, "Read the object from standard input instead of from a file.")
+		hash_obj_flag.Parse(os.Args[2:])
+
+		hash_obj_cmd(*w, *stdin, hash_obj_flag.Args())
+	default:
+		flag.Usage()
 	}
 }
 
-func init_cmd() {
-	//========================================
-	// make repository dir path
-	//========================================
-	wd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-
-	repo_path := filepath.Join(wd, REPOSITORY_DIR_NAME)
-
-	existed := true
+func find_git_repository(path string) (string, error) {
+	repo_path := filepath.Join(path, REPOSITORY_DIR_NAME)
 	if _, err := os.Stat(repo_path); os.IsNotExist(err) {
-		existed = false
-	} else if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
+		if path == filepath.Dir(path) {
+			return "", fmt.Errorf("fatal: not a git repository (or any of the parent directories): " + REPOSITORY_DIR_NAME)
+		}
 
-	//========================================
-	// create repository file and directory
-	//========================================
-	var p string
-
-	// repository dir
-	if existed == false {
-		p = filepath.Join(wd, REPOSITORY_DIR_NAME)
-		err := os.Mkdir(p, 0775)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-			os.Exit(1)
-		}
+		return find_git_repository(filepath.Dir(path))
 	}
-
-	// HEAD
-	p = filepath.Join(repo_path, "HEAD")
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = ioutil.WriteFile(p, []byte("ref: refs/heads/master"), 0664)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-			os.Exit(1)
-		}
-	}
-	// branches(dir)
-	p = filepath.Join(repo_path, "branches")
-	err = os.Mkdir(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	// config
-	p = filepath.Join(repo_path, "config")
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = ioutil.WriteFile(p, []byte(`[core]
-	repositoryformatversion = 0
-	filemode = true
-	bare = false
-	logallrefupdates = true`), 0664)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-			os.Exit(1)
-		}
-	}
-	// description
-	p = filepath.Join(repo_path, "description")
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = ioutil.WriteFile(p, []byte("Unnamed repository; edit this file 'description' to name the repository."), 0664)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-			os.Exit(1)
-		}
-	}
-	// hooks(dir)
-	p = filepath.Join(repo_path, "hooks")
-	err = os.Mkdir(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	// info(dir)
-	p = filepath.Join(repo_path, "info")
-	err = os.Mkdir(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	p = filepath.Join(repo_path, "exclude")
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		err = ioutil.WriteFile(p, []byte(`# git ls-files --others --exclude-from=.git/info/exclude
-# Lines that start with '#' are comments.
-# For a project mostly in C, the following would be a good set of
-# exclude patterns (uncomment them if you want to use them):
-# *.[oa]
-# *~`), 0664)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-			os.Exit(1)
-		}
-	}
-	// objects(dir)
-	p = filepath.Join(repo_path, "objects", "info")
-	err = os.MkdirAll(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	p = filepath.Join(repo_path, "objects", "pack")
-	err = os.MkdirAll(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	// refs(dir)
-	p = filepath.Join(repo_path, "refs", "heads")
-	err = os.MkdirAll(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-	p = filepath.Join(repo_path, "refs", "tags")
-	err = os.MkdirAll(p, 0775)
-	if err != nil && os.IsExist(err) == false {
-		fmt.Fprintf(os.Stderr, "Error: 'git init' failed. %v\n", err)
-		os.Exit(1)
-	}
-
-	//========================================
-	// print message
-	//========================================
-	if existed {
-		fmt.Printf("Reinitialized existing Git repository in %s\n", repo_path)
-	} else {
-		fmt.Printf("Initialized empty Git repository in %s\n", repo_path)
-	}
+	return repo_path, nil
 }

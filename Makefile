@@ -1,4 +1,4 @@
-toy-git: main.go
+toy-git: *.go
 	go build
 
 .PHONY: test
