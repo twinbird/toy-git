@@ -13,6 +13,7 @@ const (
 
 func main() {
 	hash_obj_flag := flag.NewFlagSet("hash-object", flag.ExitOnError)
+	cat_file_flag := flag.NewFlagSet("cat-file", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		flag.Usage()
@@ -28,6 +29,23 @@ func main() {
 		hash_obj_flag.Parse(os.Args[2:])
 
 		hash_obj_cmd(*w, *stdin, hash_obj_flag.Args())
+	case "cat-file":
+		t := cat_file_flag.Bool("t", false, "Instead of the content, show the object type identified by <object>.")
+		s := cat_file_flag.Bool("s", false, "Instead of the content, show the object size identified by <object>.")
+		p := cat_file_flag.Bool("p", false, "Pretty-print the contents of <object> based on its type.")
+		cat_file_flag.Parse(os.Args[2:])
+
+		if *t == false && *s == false && *p == false {
+			cat_file_flag.Usage()
+			return
+		}
+
+		if len(cat_file_flag.Args()) < 1 {
+			cat_file_flag.Usage()
+			return
+		}
+
+		cat_file_cmd(*t, *s, *p, cat_file_flag.Args())
 	default:
 		flag.Usage()
 	}

@@ -5,6 +5,7 @@ toy-git: *.go
 .SILENT:
 test: clean toy-git
 	test/init_test.sh
+	test/hash_cat_test.sh
 
 .PHONY: clean
 clean:

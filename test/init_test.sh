@@ -68,3 +68,6 @@ if [ "$HEAD_TEXT" != "ref: refs/heads/master" ]; then
   echo "Actual: $HEAD_TEXT"
   exit
 fi
+
+# cleanup
+rm -rf $REPOSITORY_DIR_NAME
