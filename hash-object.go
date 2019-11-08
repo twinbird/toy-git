@@ -13,7 +13,7 @@ import (
 
 func hash_obj_cmd(write bool, stdin bool, files []string) {
 	if stdin {
-		hash_object(write, os.Stdin)
+		hash_obj_cmd_sub(write, os.Stdin)
 		return
 	}
 
@@ -25,18 +25,26 @@ func hash_obj_cmd(write bool, stdin bool, files []string) {
 		}
 		defer f.Close()
 
-		if err := hash_object(write, f); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: 'git hash-object' failed. %v\n", err)
-			os.Exit(1)
-		}
+		hash_obj_cmd_sub(write, f)
 	}
 }
 
-func hash_object(write bool, f *os.File) error {
+func hash_obj_cmd_sub(write bool, f *os.File) {
+	sha, err := hash_object(write, f)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: 'git hash-object' failed. %v\n", err)
+		os.Exit(1)
+	}
+	if write == false {
+		fmt.Printf("%x\n", sha)
+	}
+}
+
+func hash_object(write bool, f *os.File) ([]byte, error) {
 	// contents
 	content, err := ioutil.ReadAll(f)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// header
@@ -54,16 +62,15 @@ func hash_object(write bool, f *os.File) error {
 	key := h.Sum(nil)
 
 	if write == false {
-		fmt.Printf("%x\n", key)
-		return nil
+		return key, nil
 	}
 
 	// store object database
 	if err := write_hash_object(key, obj); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return key, nil
 }
 
 func write_hash_object(key []byte, obj []byte) error {

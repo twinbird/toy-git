@@ -14,6 +14,7 @@ const (
 func main() {
 	hash_obj_flag := flag.NewFlagSet("hash-object", flag.ExitOnError)
 	cat_file_flag := flag.NewFlagSet("cat-file", flag.ExitOnError)
+	update_index_flag := flag.NewFlagSet("update-index", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		flag.Usage()
@@ -46,6 +47,22 @@ func main() {
 		}
 
 		cat_file_cmd(*t, *s, *p, cat_file_flag.Args())
+	case "update-index":
+		add := update_index_flag.Bool("add", false, "If a specified file isn't in the index already then it's added. Default behaviour is to ignore new files.")
+		remove := update_index_flag.Bool("remove", false, "If a specified file is in the index but is missing then it's removed. Default behavior is to ignore removed file.")
+		update_index_flag.Parse(os.Args[2:])
+
+		if *add == true && *remove == true {
+			update_index_flag.Usage()
+			return
+		}
+
+		if len(update_index_flag.Args()) < 1 {
+			update_index_flag.Usage()
+			return
+		}
+
+		update_index_cmd(*add, *remove, update_index_flag.Args())
 	default:
 		flag.Usage()
 	}
