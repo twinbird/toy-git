@@ -7,12 +7,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"syscall"
-
-	"gopkg.in/djherbis/times.v1"
 )
 
 type Dircache struct {
@@ -31,14 +30,14 @@ type DircacheEntry struct {
 	CTimeNanoSeconds uint32
 	MTimeSeconds     uint32
 	MTimeNanoSeconds uint32
-	Dev              int32
-	Inode            int32
-	Mode             int32
+	Dev              uint32
+	Inode            uint32
+	Mode             uint32
 	UID              uint32
 	GID              uint32
-	Size             int32
+	Size             uint32
 	Sha1             [20]byte
-	Flags            int16  // [1-bit: assume-valid flag] [1-bit: extended flag(must be zero)] [2-bit: stage(during merge)] [12-bit: name length]
+	Flags            uint16 // [1-bit: assume-valid flag] [1-bit: extended flag(must be zero)] [2-bit: stage(during merge)] [12-bit: name length]
 	PathName         []byte // variable length. size is 'Size'
 	ZeroPaddingSize  int    // for 8 byte alignment
 }
@@ -55,38 +54,38 @@ func build_dircache_bytes(d *Dircache) []byte {
 	buf := new(bytes.Buffer)
 
 	// Header
-	binary.Write(buf, binary.LittleEndian, d.Header.Signature)
-	binary.Write(buf, binary.LittleEndian, d.Header.Version)
-	binary.Write(buf, binary.LittleEndian, d.Header.NumberOfEntries)
+	binary.Write(buf, binary.BigEndian, d.Header.Signature)
+	binary.Write(buf, binary.BigEndian, d.Header.Version)
+	binary.Write(buf, binary.BigEndian, d.Header.NumberOfEntries)
 
 	// Entries
 	for _, e := range d.Entries {
 		s := 0
-		binary.Write(buf, binary.LittleEndian, e.CTimeSeconds)
+		binary.Write(buf, binary.BigEndian, e.CTimeSeconds)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.CTimeNanoSeconds)
+		binary.Write(buf, binary.BigEndian, e.CTimeNanoSeconds)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.MTimeSeconds)
+		binary.Write(buf, binary.BigEndian, e.MTimeSeconds)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.MTimeNanoSeconds)
+		binary.Write(buf, binary.BigEndian, e.MTimeNanoSeconds)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.Dev)
+		binary.Write(buf, binary.BigEndian, e.Dev)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.Inode)
+		binary.Write(buf, binary.BigEndian, e.Inode)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.Mode)
+		binary.Write(buf, binary.BigEndian, e.Mode)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.UID)
+		binary.Write(buf, binary.BigEndian, e.UID)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.GID)
+		binary.Write(buf, binary.BigEndian, e.GID)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.Size)
+		binary.Write(buf, binary.BigEndian, e.Size)
 		s += 4
-		binary.Write(buf, binary.LittleEndian, e.Sha1)
+		binary.Write(buf, binary.BigEndian, e.Sha1)
 		s += 20
-		binary.Write(buf, binary.LittleEndian, e.Flags)
+		binary.Write(buf, binary.BigEndian, e.Flags)
 		s += 2
-		binary.Write(buf, binary.LittleEndian, e.PathName)
+		binary.Write(buf, binary.BigEndian, e.PathName)
 		s += len(e.PathName)
 
 		// padding
@@ -100,6 +99,9 @@ func build_dircache_bytes(d *Dircache) []byte {
 
 func write_dircache(d *Dircache, repop string) error {
 	// sort by filename
+
+	// set entry nunber
+	d.Header.NumberOfEntries = int32(len(d.Entries))
 
 	b := build_dircache_bytes(d)
 
@@ -143,21 +145,14 @@ func update_index_cmd(do_add bool, do_remove bool, paths []string) {
 
 func add_dircache(d *Dircache, path string) {
 	// file stat
-	info, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
 		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
 		os.Exit(128)
 	}
 
-	// file times
-	t, err := times.Stat(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
-		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
-		os.Exit(128)
-	}
-
+	// create hash-object
 	f, err := os.Open(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
@@ -176,31 +171,52 @@ func add_dircache(d *Dircache, path string) {
 
 	switch runtime.GOOS {
 	case "windows":
-		// TODO
-	case "darwing":
-		// TODO
-		//internal_info := info.Sys().(*syscall.Stat_t)
+		log.Fatal("windows not suppported")
 	default:
 		internal_info := info.Sys().(*syscall.Stat_t)
 
-		ctime := t.ChangeTime()
-		e.CTimeSeconds = uint32(ctime.Unix())
-		e.CTimeNanoSeconds = uint32(ctime.UnixNano() - ctime.Unix())
+		e.CTimeSeconds = uint32(internal_info.Ctim.Sec)
+		e.CTimeNanoSeconds = uint32(internal_info.Ctim.Nsec)
 
-		mtime := t.ModTime()
-		e.MTimeSeconds = uint32(mtime.Unix())
-		e.MTimeNanoSeconds = uint32(mtime.UnixNano() - mtime.Unix())
+		e.MTimeSeconds = uint32(internal_info.Mtim.Sec)
+		e.MTimeNanoSeconds = uint32(internal_info.Mtim.Nsec)
 
-		e.Dev = int32(internal_info.Dev)
-		e.Inode = int32(internal_info.Ino)
-		e.Mode = int32(info.Mode())
+		e.Dev = uint32(internal_info.Dev)
+		e.Inode = uint32(internal_info.Ino)
+
+		var modeFlag uint32
+		// 4-bit object type valid values in binary are 1000 (regular file), 1010 (symbolic link) and 1110 (gitlink)
+		if info.Mode()&os.ModeSymlink != 0 {
+			modeFlag |= uint32(0b00000000000000001010000000000000)
+		} else {
+			// regular file (git link is current unsupported)
+			modeFlag |= uint32(0b00000000000000001000000000000000)
+		}
+		// 3-bit unused
+		// 9-bit unix permission. Only 0755 and 0644 are valid for regular files. Symbolic links and gitlinks have value 0 in this field.
+		if info.Mode()&os.ModeSymlink == 0 {
+			perm := uint32(0644)
+			perm |= (uint32(0111) & uint32(info.Mode()))
+			modeFlag |= perm
+		}
+		e.Mode = modeFlag
+
 		e.UID = internal_info.Uid
 		e.GID = internal_info.Gid
-		e.Size = int32(info.Size())
+		e.Size = uint32(info.Size())
+
 		for i, v := range sha {
 			e.Sha1[i] = v
 		}
-		e.Flags = 0 // [1-bit: assume-valid flag] [1-bit: extended flag(must be zero)] [2-bit: stage(during merge)] [12-bit: name length]
+
+		var flag uint16
+		flag |= uint16(0b0000000000000000)     // [1-bit: assume-valid flag]
+		flag |= uint16(0b0000000000000000)     // [1-bit: extended flag(must be zero)]
+		flag |= uint16(0b0000000000000000)     // [2-bit: stage(during merge)]
+		mask := uint16(0b00001111111111111111) // [12-bit: name length]
+		flag |= mask & uint16(len(path))
+		e.Flags = flag
+
 		e.PathName = []byte(path)
 		d.Entries = append(d.Entries, e)
 	}
