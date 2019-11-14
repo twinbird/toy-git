@@ -15,6 +15,7 @@ func main() {
 	hash_obj_flag := flag.NewFlagSet("hash-object", flag.ExitOnError)
 	cat_file_flag := flag.NewFlagSet("cat-file", flag.ExitOnError)
 	update_index_flag := flag.NewFlagSet("update-index", flag.ExitOnError)
+	ls_files_flag := flag.NewFlagSet("ls-files", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		flag.Usage()
@@ -63,6 +64,17 @@ func main() {
 		}
 
 		update_index_cmd(*add, *remove, update_index_flag.Args())
+	case "ls-files":
+		cached := ls_files_flag.Bool("c", false, "Show cached files in the output (default)")
+		deleted := ls_files_flag.Bool("d", false, "Show deleted files in the output")
+		modified := ls_files_flag.Bool("m", false, "Show modified files in the output")
+		ls_files_flag.Parse(os.Args[2:])
+
+		if *cached == false && *deleted == false && *modified == false {
+			*cached = true
+		}
+
+		ls_files_cmd(*cached, *deleted, *modified)
 	default:
 		flag.Usage()
 	}

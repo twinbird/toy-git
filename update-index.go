@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -43,11 +44,104 @@ type DircacheEntry struct {
 }
 
 func load_dircache(path string) (*Dircache, error) {
-	d := &Dircache{}
-	d.Header.Signature = [4]byte{'D', 'I', 'R', 'C'}
-	d.Header.Version = 2
-	d.Header.NumberOfEntries = 0
-	return d, nil
+	contents, err := ioutil.ReadFile(filepath.Join(path, "index"))
+	if err != nil && os.IsNotExist(err) {
+		// return new dircache
+		d := &Dircache{}
+		d.Header.Signature = [4]byte{'D', 'I', 'R', 'C'}
+		d.Header.Version = 2
+		d.Header.NumberOfEntries = 0
+		return d, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	// read exist dircache
+	return read_dircache_bytes(contents)
+}
+
+func read_dircache_bytes(b []byte) (*Dircache, error) {
+	buf := bytes.NewReader(b)
+	var d Dircache
+
+	// Header
+	binary.Read(buf, binary.BigEndian, &d.Header.Signature)
+	binary.Read(buf, binary.BigEndian, &d.Header.Version)
+	binary.Read(buf, binary.BigEndian, &d.Header.NumberOfEntries)
+
+	// Entries
+	for i := int32(0); i < d.Header.NumberOfEntries; i++ {
+		var e DircacheEntry
+		n := 0
+		if err := binary.Read(buf, binary.BigEndian, &e.CTimeSeconds); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.CTimeNanoSeconds); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.MTimeSeconds); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.MTimeNanoSeconds); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.Dev); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.Inode); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.Mode); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.UID); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.GID); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.Size); err != nil {
+			return nil, err
+		}
+		n += 4
+		if err := binary.Read(buf, binary.BigEndian, &e.Sha1); err != nil {
+			return nil, err
+		}
+		n += 20
+		if err := binary.Read(buf, binary.BigEndian, &e.Flags); err != nil {
+			return nil, err
+		}
+		n += 2
+
+		name_len := e.Flags
+		name_len &= uint16(0b00001111111111111111) // [12-bit: name length]
+
+		b := make([]byte, name_len)
+		if _, err := io.ReadAtLeast(buf, b, int(name_len)); err != nil {
+			return nil, err
+		}
+		e.PathName = b
+		n += int(name_len)
+
+		// padding
+		for k := 0; k < (8 - n%8); k++ {
+			var padding byte
+			binary.Read(buf, binary.BigEndian, padding)
+		}
+
+		d.Entries = append(d.Entries, &e)
+	}
+
+	return &d, nil
 }
 
 func build_dircache_bytes(d *Dircache) []byte {
@@ -89,7 +183,7 @@ func build_dircache_bytes(d *Dircache) []byte {
 		s += len(e.PathName)
 
 		// padding
-		for i := 0; i < (s % 8); i++ {
+		for i := 0; i < (8 - s%8); i++ {
 			buf.WriteByte(byte(0))
 		}
 	}
@@ -123,27 +217,38 @@ func update_index_cmd(do_add bool, do_remove bool, paths []string) {
 
 	// read dircache
 	d, err := load_dircache(repop)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fatal: internal error: %v\n", err)
+		os.Exit(128)
+	}
 
 	// update or add or remove dircache
 	for _, p := range paths {
 		if do_add {
-			add_dircache(d, p)
+			update_dircache(d, p, true)
 		} else if do_remove {
 			remove_dircache(d, p)
 		} else {
-			update_dircache(d, p)
+			update_dircache(d, p, false)
 		}
 	}
 
 	// write dircache
 	err = write_dircache(d, repop)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fatal: internal error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-// update and remove error messages
-// error: update-index.go: cannot add to the index - missing --add option?
-// fatal: Unable to process path update-index.go
+func update_dircache(d *Dircache, path string, do_add bool) {
+	// already added?
+	if find_dircache_entry(d, path) < 0 && do_add == false {
+		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
+		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
+		os.Exit(128)
+	}
 
-func add_dircache(d *Dircache, path string) {
 	// file stat
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -222,7 +327,15 @@ func add_dircache(d *Dircache, path string) {
 	}
 }
 
-func update_dircache(d *Dircache, path string) {
+func find_dircache_entry(d *Dircache, path string) int {
+	pathb := []byte(path)
+
+	for i, d := range d.Entries {
+		if bytes.Equal(d.PathName, pathb) {
+			return i
+		}
+	}
+	return -1
 }
 
 func remove_dircache(d *Dircache, path string) {

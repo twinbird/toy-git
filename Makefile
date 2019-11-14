@@ -13,3 +13,4 @@ clean:
 	rm -f toy-git
 	rm -rf .toy-git
 	rm -rf test/.toy-git
+	-unlink test/.git 2>/dev/null
