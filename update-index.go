@@ -227,7 +227,10 @@ func update_index_cmd(do_add bool, do_remove bool, paths []string) {
 		if do_add {
 			update_dircache(d, p, true)
 		} else if do_remove {
-			remove_dircache(d, p)
+			if err := remove_dircache(d, p); err != nil {
+				fmt.Fprintf(os.Stderr, "fatal: internal error: %v\n", err)
+				os.Exit(128)
+			}
 		} else {
 			update_dircache(d, p, false)
 		}
@@ -338,5 +341,23 @@ func find_dircache_entry(d *Dircache, path string) int {
 	return -1
 }
 
-func remove_dircache(d *Dircache, path string) {
+func remove_dircache(d *Dircache, path string) error {
+	// already added in cache?
+	idx := find_dircache_entry(d, path)
+	if idx < 0 {
+		return fmt.Errorf("%s is not found in index\n", path)
+	}
+
+	// already deleted on filesystem?
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	}
+	if err != nil && os.IsNotExist(err) == false {
+		return err
+	}
+
+	d.Entries = append(d.Entries[:idx], d.Entries[idx+1:]...)
+
+	return nil
 }
