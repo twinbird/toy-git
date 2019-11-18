@@ -60,9 +60,9 @@ touch a.txt
 ../toy-git update-index --remove a.txt
 
 # testing by git command
-EXPECT_LS_FILES_MESSAGE="test-target-dir/test-target-file-nested.txt
-test-target-file.txt
-a.txt"
+EXPECT_LS_FILES_MESSAGE="a.txt
+test-target-dir/test-target-file-nested.txt
+test-target-file.txt"
 EXPECT_GIT_LS_FILES_MESSAGE=`git ls-files`
 if [[ "$EXPECT_GIT_LS_FILES_MESSAGE" != "$EXPECT_LS_FILES_MESSAGE" ]]; then
   echo "[update-index] 'update-index --remove' without rm file is failed."

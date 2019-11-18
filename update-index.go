@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"syscall"
 )
 
@@ -193,6 +194,9 @@ func build_dircache_bytes(d *Dircache) []byte {
 
 func write_dircache(d *Dircache, repop string) error {
 	// sort by filename
+	sort.Slice(d.Entries, func(i, k int) bool {
+		return bytes.Compare(d.Entries[i].PathName, d.Entries[k].PathName) < 0
+	})
 
 	// set entry nunber
 	d.Header.NumberOfEntries = int32(len(d.Entries))
