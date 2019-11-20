@@ -6,7 +6,8 @@ toy-git: *.go
 test: clean toy-git
 	test/init_test.sh
 	test/hash_cat_test.sh
-	test/update-index.sh
+	test/update_index_test.sh
+	test/write_tree_test.sh
 
 .PHONY: clean
 clean:
@@ -14,4 +15,5 @@ clean:
 	rm -rf .toy-git
 	rm -rf test/.toy-git
 	-unlink test/.git 2>/dev/null
+	rm -rf test/.git
 	rm -f test/[a-z].txt

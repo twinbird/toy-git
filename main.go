@@ -75,6 +75,8 @@ func main() {
 		}
 
 		ls_files_cmd(*cached, *deleted, *modified)
+	case "write-tree":
+		write_tree_cmd()
 	default:
 		flag.Usage()
 	}
