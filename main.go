@@ -16,6 +16,7 @@ func main() {
 	cat_file_flag := flag.NewFlagSet("cat-file", flag.ExitOnError)
 	update_index_flag := flag.NewFlagSet("update-index", flag.ExitOnError)
 	ls_files_flag := flag.NewFlagSet("ls-files", flag.ExitOnError)
+	commit_tree_flag := flag.NewFlagSet("commit-tree", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		flag.Usage()
@@ -77,6 +78,17 @@ func main() {
 		ls_files_cmd(*cached, *deleted, *modified)
 	case "write-tree":
 		write_tree_cmd()
+	case "commit-tree":
+		if len(os.Args) < 3 {
+			commit_tree_flag.Usage()
+			return
+		}
+
+		tree_sha := os.Args[2]
+		parent := commit_tree_flag.String("p", "", "Each -p indicates the id of a parent commit object")
+		commit_tree_flag.Parse(os.Args[3:])
+
+		commit_tree_cmd(tree_sha, *parent)
 	default:
 		flag.Usage()
 	}

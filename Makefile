@@ -8,6 +8,7 @@ test: clean toy-git
 	test/hash_cat_test.sh
 	test/update_index_test.sh
 	test/write_tree_test.sh
+	test/commit_tree_test.sh
 
 .PHONY: clean
 clean:
