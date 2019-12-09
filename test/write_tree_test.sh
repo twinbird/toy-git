@@ -13,10 +13,10 @@ git init > /dev/null
 
 # create index
 ../toy-git update-index --add test-target-file.txt
-#../toy-git update-index --add test-target-dir/test-target-file-nested.txt
+../toy-git update-index --add test-target-dir/test-target-file-nested.txt
 
 git update-index --add test-target-file.txt
-#git update-index --add test-target-dir/test-target-file-nested.txt
+git update-index --add test-target-dir/test-target-file-nested.txt
 
 # write-tree
 
