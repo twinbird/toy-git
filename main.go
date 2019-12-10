@@ -18,6 +18,29 @@ func main() {
 	ls_files_flag := flag.NewFlagSet("ls-files", flag.ExitOnError)
 	commit_tree_flag := flag.NewFlagSet("commit-tree", flag.ExitOnError)
 
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `toy-git 
+Git Plumbing commands implementation for learning git internal.
+You **MUST NOT** use your production repository.
+(toy-git manipulates the .toy-git directory)
+
+toy-git is sets of subcommands.
+ * toy-git init
+ * toy-git hash-object
+ * toy-git cat-file
+ * toy-git update-index
+ * toy-git ls-files
+ * toy-git write-tree
+ * toy-git commit-tree
+ * toy-git update-ref
+
+See also each subcommands help.
+
+Ex) toy-git hash-object -h
+
+`)
+	}
+
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
@@ -89,6 +112,13 @@ func main() {
 		commit_tree_flag.Parse(os.Args[3:])
 
 		commit_tree_cmd(tree_sha, *parent)
+	case "update-ref":
+		if len(os.Args) < 4 {
+			fmt.Fprintf(os.Stderr, "toy-git update-ref <ref> <newvalue>")
+			return
+		}
+
+		update_ref_cmd(os.Args[2], os.Args[3])
 	default:
 		flag.Usage()
 	}
