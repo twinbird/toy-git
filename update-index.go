@@ -259,7 +259,7 @@ func update_dircache(d *Dircache, path string, do_add bool) {
 	// file stat
 	info, err := os.Lstat(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
+		fmt.Fprintf(os.Stderr, "internal error: %v\n", err)
 		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
 		os.Exit(128)
 	}
@@ -267,14 +267,14 @@ func update_dircache(d *Dircache, path string, do_add bool) {
 	// create hash-object
 	f, err := os.Open(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
+		fmt.Fprintf(os.Stderr, "internal error: %v\n", err)
 		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
 		os.Exit(128)
 	}
 	defer f.Close()
 	sha, err := hash_object(true, f)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s: does not exist and --remove not passed\n", path)
+		fmt.Fprintf(os.Stderr, "internal error: %v\n", err)
 		fmt.Fprintf(os.Stderr, "fatal: Unable to process path %s\n", path)
 		os.Exit(128)
 	}
