@@ -112,7 +112,7 @@ func write_hash_object(key []byte, obj []byte) error {
 
 	// store to file
 	err = ioutil.WriteFile(fpath, b.Bytes(), 0644)
-	if err != nil {
+	if err != nil && os.IsNotExist(err) == true {
 		return err
 	}
 
